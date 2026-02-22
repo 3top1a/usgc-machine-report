@@ -277,13 +277,14 @@ if (( ${cpu_sockets:-1} > 1 )); then
   cpu_text+=" / $cpu_sockets Sockets"
 fi
 
-load_avg_1min=$(uptime | awk -F'load average: ' '{print $2}' | cut -d ',' -f1 | tr -d ' ')
-load_avg_5min=$(uptime | awk -F'load average: ' '{print $2}' | cut -d ',' -f2 | tr -d ' ')
-load_avg_15min=$(uptime| awk -F'load average: ' '{print $2}' | cut -d ',' -f3 | tr -d ' ')
+read -r load_avg_1min load_avg_5min load_avg_15min < <(
+    awk '{print $1, $2, $3}' /proc/loadavg
+)
 
 # Memory Information
-mem_total=$(grep 'MemTotal' /proc/meminfo | awk '{print $2}')
-mem_available=$(grep 'MemAvailable' /proc/meminfo | awk '{print $2}')
+read -r mem_total mem_available < <(
+    awk '/^MemTotal:/ {total=$2} /^MemAvailable:/ {avail=$2} END {print total, avail}' /proc/meminfo
+)
 mem_used=$((mem_total - mem_available))
 mem_percent=$(awk -v used="$mem_used" -v total="$mem_total" 'BEGIN { printf "%.2f", (used / total) * 100 }')
 mem_percent=$(printf "%.2f" "$mem_percent")
@@ -295,7 +296,7 @@ declare -a disk_names
 declare -a disk_info
 declare -a disk_use_percent
 declare -a disk_graphs
-while read -r filesystem size used available use_percent mount_point; do
+while read -r _filesystem size used _available use_percent mount_point; do
     # Always include root, skip pseudo filesystem mount points for others
     if [[ "$mount_point" != "/" ]]; then
         case "$mount_point" in

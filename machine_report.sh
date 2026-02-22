@@ -3,6 +3,10 @@
 # TR-100 Machine Report
 # Copyright © 2024, U.S. Graphics, LLC. BSD-3-Clause License.
 
+# Force C locale for consistent numeric formatting
+export LC_ALL=C
+
+
 # Global variables
 MIN_NAME_LEN=5
 MAX_NAME_LEN=10

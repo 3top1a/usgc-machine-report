@@ -345,12 +345,13 @@ fi
 
 # Uptime
 get_uptime() {
+    local uptime_seconds
     if [ -f /proc/uptime ]; then
         # Linux
-        local uptime_seconds=$(cut -d. -f1 /proc/uptime)
+        uptime_seconds=$(cut -d. -f1 /proc/uptime)
     elif command -v sysctl >/dev/null 2>&1; then
         # BSD/macOS
-        local boot_time=$(sysctl -n kern.boottime | awk '{print $4}' | tr -d ',')
+        boot_time=$(sysctl -n kern.boottime | awk '{print $4}' | tr -d ',')
         local uptime_seconds=$(($(date +%s) - boot_time))
     else
         echo "Unknown"
@@ -419,10 +420,10 @@ PRINT_DATA "USER" "$net_current_user"
 PRINT_DIVIDER
 PRINT_DATA "PROCESSOR" "$cpu_model"
 PRINT_DATA "" "$cpu_text"
-if [ ! -z "$cpu_hypervisor" ]; then
+if [ -n "$cpu_hypervisor" ]; then
   PRINT_DATA "HYPERVISOR" "$cpu_hypervisor"
 fi
-if [ ! -z "$cpu_freq" ]; then
+if [ -n "$cpu_freq" ]; then
   PRINT_DATA "CPU FREQ" "$cpu_freq GHz"
 fi
 PRINT_DATA "LOAD  1m" "$cpu_1min_bar_graph"
@@ -452,7 +453,7 @@ PRINT_DIVIDER
 PRINT_DATA "MEMORY" "${mem_used_gb}/${mem_total_gb} GiB [${mem_percent}%]"
 PRINT_DATA "" "${mem_bar_graph}"
 PRINT_DIVIDER
-if [ ! -z "$last_login_time" ]; then
+if [ -n "$last_login_time" ]; then
 		PRINT_DATA "LAST LOGIN" "$last_login_time"
 fi
 

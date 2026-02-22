@@ -1,10 +1,11 @@
-#!/bin/bash
+#!/usr/bin/env bash
+
 # TR-100 Machine Report
 # Copyright © 2024, U.S. Graphics, LLC. BSD-3-Clause License.
 
 # Global variables
 MIN_NAME_LEN=5
-MAX_NAME_LEN=13
+MAX_NAME_LEN=10
 
 MIN_DATA_LEN=20
 MAX_DATA_LEN=32
@@ -118,7 +119,7 @@ PRINT_DIVIDER() {
     local divider="$left_symbol"
     for (( i = 0; i < length - 3; i++ )); do
         divider+="─"
-        if [ "$i" -eq 14 ]; then
+        if (( i == $MAX_NAME_LEN+1 )); then
             divider+="$middle_symbol"
         fi
     done
@@ -233,7 +234,7 @@ get_ip_addr() {
 
 # Operating System Information
 source /etc/os-release
-os_name="${ID^} ${VERSION} ${VERSION_CODENAME^}"
+os_name="${ID^} ${VERSION_ID}"
 os_kernel=$({ uname; uname -r; } | tr '\n' ' ')
 
 # Network Information

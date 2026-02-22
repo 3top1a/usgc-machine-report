@@ -47,7 +47,6 @@ set_current_len() {
         "$os_kernel"
         "$net_hostname"
         "$net_machine_ip"
-        "$net_client_ip"
         "$net_current_user"
         "$cpu_model"
         "$cpu_cores_per_socket CPU(s) / $cpu_sockets Socket(s)"
@@ -258,11 +257,6 @@ fi
 if [ -z "$net_hostname" ]; then net_hostname="Not Defined"; fi
 
 net_machine_ip=$(get_ip_addr)
-net_client_ip=$(who am i | awk '{print $5}' | tr -d '()')
-if [ -z "$net_client_ip" ]; then
-    net_client_ip="Not connected"
-fi
-net_dns_ip=($(grep '^nameserver [0-9.]' /etc/resolv.conf | awk '{print $2}'))
 
 # CPU Information
 cpu_model="$(lscpu | grep 'Model name' | grep -v 'BIOS' | cut -f 2 -d ':' | awk '{print $1 " "  $2 " " $3 " " $4}')"
@@ -291,7 +285,6 @@ mem_used=$((mem_total - mem_available))
 mem_percent=$(awk -v used="$mem_used" -v total="$mem_total" 'BEGIN { printf "%.2f", (used / total) * 100 }')
 mem_percent=$(printf "%.2f" "$mem_percent")
 mem_total_gb=$(echo "$mem_total" | awk '{ printf "%.2f", $1 / (1024 * 1024) }') # (From Ki to Gi units)
-mem_available_gb=$(echo "$mem_available" | awk '{ printf "%.2f", $1 / (1024 * 1024) }') # (From Ki to Gi units) Not used currently
 mem_used_gb=$(echo "$mem_used" | awk '{ printf "%.2f", $1 / (1024 * 1024) }')
 
 # Disk Information
@@ -410,11 +403,6 @@ PRINT_DATA "KERNEL" "$os_kernel"
 PRINT_DIVIDER
 PRINT_DATA "HOSTNAME" "$net_hostname"
 PRINT_DATA "MACHINE IP" "$net_machine_ip"
-PRINT_DATA "CLIENT  IP" "$net_client_ip"
-
-for dns_num in "${!net_dns_ip[@]}"; do
-    PRINT_DATA "DNS  IP $(($dns_num + 1))" "${net_dns_ip[dns_num]}"
-done
 
 PRINT_DATA "USER" "$net_current_user"
 PRINT_DIVIDER

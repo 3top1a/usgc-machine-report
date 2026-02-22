@@ -9,15 +9,15 @@ export LC_NUMERIC=C
 
 # Global variables
 MIN_NAME_LEN=5
-MAX_NAME_LEN=10
+MAX_NAME_LEN=9
 
-MIN_DATA_LEN=20
-MAX_DATA_LEN=32
+MIN_DATA_LEN=32
+MAX_DATA_LEN=60
 
 BORDERS_AND_PADDING=7
 
 # Basic configuration, change as needed
-report_title="UNITED STATES GRAPHICS COMPANY"
+report_title="TR-100 MACHINE REPORT"
 last_login_ip_present=0
 
 # Utilities
@@ -41,6 +41,8 @@ max_length() {
 
 # All data strings must go here
 set_current_len() {
+  padding=$(printf '%*s' "$MIN_DATA_LEN" '' | tr ' ' 'a')
+
 	local all_strings=(
         "$report_title"
         "$os_name"
@@ -49,7 +51,7 @@ set_current_len() {
         "$net_machine_ip"
         "$net_current_user"
         "$cpu_model"
-        "$cpu_cores_per_socket CPU(s) / $cpu_sockets Socket(s)"
+        "$cpu_text"
         "$cpu_hypervisor"
         "$cpu_freq GHz"
         "$cpu_1min_bar_graph"
@@ -64,8 +66,9 @@ set_current_len() {
         "$last_login_time"
         "$last_login_ip"
         "$sys_uptime"
+        "$MIN_DATA_LEN"
+        "$padding"
     )
-
 
     # Add all disk info strings
     for info in "${disk_info[@]}"; do
@@ -396,16 +399,23 @@ done
 # Machine Report
 PRINT_HEADER
 PRINT_CENTERED_DATA "$report_title"
-PRINT_CENTERED_DATA "TR-100 MACHINE REPORT"
+PRINT_CENTERED_DATA "$net_current_user@$net_hostname"
 PRINT_DIVIDER "top"
 PRINT_DATA "OS" "$os_name"
-PRINT_DATA "KERNEL" "$os_kernel"
-PRINT_DIVIDER
-PRINT_DATA "HOSTNAME" "$net_hostname"
-PRINT_DATA "MACHINE IP" "$net_machine_ip"
+PRINT_DATA "" "$os_kernel"
+PRINT_DATA "LOCAL IP" "$net_machine_ip"
 
-PRINT_DATA "USER" "$net_current_user"
+PRINT_DATA "UPTIME" "$sys_uptime"
+
+if [ -n "$last_login_time" ]; then
+		PRINT_DATA "LOGIN" "$last_login_time"
+fi
+if [ $last_login_ip_present -eq 1 ]; then
+    PRINT_DATA "" "$last_login_ip"
+fi
+
 PRINT_DIVIDER
+
 PRINT_DATA "PROCESSOR" "$cpu_model"
 PRINT_DATA "" "$cpu_text"
 if [ -n "$cpu_hypervisor" ]; then
@@ -418,6 +428,10 @@ PRINT_DATA "LOAD  1m" "$cpu_1min_bar_graph"
 PRINT_DATA "      5m" "$cpu_5min_bar_graph"
 PRINT_DATA "      15m" "$cpu_15min_bar_graph"
 
+PRINT_DIVIDER
+
+PRINT_DATA "MEMORY" "${mem_used_gb}/${mem_total_gb} GiB [${mem_percent}%]"
+PRINT_DATA "" "${mem_bar_graph}"
 
 PRINT_DIVIDER
 
@@ -432,22 +446,9 @@ for i in "${!disk_names[@]}"; do
     if [ "${#display_name}" -gt 10 ]; then
         display_name="$(echo "$display_name" | cut -c 1-7)..."
     fi
-    
+
     PRINT_DATA "$display_name" "${disk_info[$i]}"
     PRINT_DATA "" "${disk_graphs[$i]}"
 done
 
-PRINT_DIVIDER
-PRINT_DATA "MEMORY" "${mem_used_gb}/${mem_total_gb} GiB [${mem_percent}%]"
-PRINT_DATA "" "${mem_bar_graph}"
-PRINT_DIVIDER
-if [ -n "$last_login_time" ]; then
-		PRINT_DATA "LAST LOGIN" "$last_login_time"
-fi
-
-if [ $last_login_ip_present -eq 1 ]; then
-    PRINT_DATA "" "$last_login_ip"
-fi
-
-PRINT_DATA "UPTIME" "$sys_uptime"
 PRINT_DIVIDER "bottom"

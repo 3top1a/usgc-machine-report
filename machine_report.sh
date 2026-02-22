@@ -179,28 +179,22 @@ PRINT_FOOTER() {
 }
 
 bar_graph() {
-    local percent
-    local num_blocks
-    local width=$CURRENT_LEN
-    local graph=""
-    local used=$1
-    local total=$2
+    local used=$1 total=$2 width=$CURRENT_LEN
 
-    if (( total == 0 )); then
-        percent=0
-    else
-        percent=$(awk -v used="$used" -v total="$total" 'BEGIN { printf "%.2f", (used / total) * 100 }')
-    fi
+    awk -v used="$used" -v total="$total" -v width="$width" 'BEGIN {
+        if (total == 0) { ratio = 0 }
+        else {
+            ratio = used / total
+            if (ratio > 1.0) ratio = 1.0
+            if (ratio < 0) ratio = 0
+        }
 
-    num_blocks=$(awk -v percent="$percent" -v width="$width" 'BEGIN { printf "%d", (percent / 100) * width }')
+        blocks = int(ratio * width)
+        empty = width - blocks
 
-    for (( i = 0; i < num_blocks; i++ )); do
-        graph+="█"
-    done
-    for (( i = num_blocks; i < width; i++ )); do
-        graph+="░"
-    done
-    printf "%s" "${graph}"
+        for (i = 0; i < blocks; i++) printf "█"
+        for (i = 0; i < empty; i++) printf "░"
+    }'
 }
 
 get_ip_addr() {

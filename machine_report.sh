@@ -48,7 +48,7 @@ set_current_len() {
         "$net_client_ip"                                         \
         "$net_current_user"                                      \
         "$cpu_model"                                             \
-        "$cpu_cores_per_socket vCPU(s) / $cpu_sockets Socket(s)" \
+        "$cpu_cores_per_socket CPU(s) / $cpu_sockets Socket(s)" \
         "$cpu_hypervisor"                                        \
         "$cpu_freq GHz"                                          \
         "$cpu_1min_bar_graph"                                    \
@@ -300,22 +300,60 @@ else
 fi
 
 # Last login and Uptime
-last_login=$(lastlog -u "$USER")
-last_login_ip=$(echo "$last_login" | awk 'NR==2 {print $3}')
+if [[ $( command -v lastlog ) ]]; then
+		last_login=$(lastlog -u "$USER")
+		last_login_ip=$(echo "$last_login" | awk 'NR==2 {print $3}')
 
-# Check if last_login_ip is an IP address
-if [[ "$last_login_ip" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-    last_login_ip_present=1
-    last_login_time=$(echo "$last_login" | awk 'NR==2 {print $6, $7, $10, $8}')
-else
-    last_login_time=$(echo "$last_login" | awk 'NR==2 {print $4, $5, $8, $6}')
-    # Check for **Never logged in** edge case
-    if [ "$last_login_time" = "in**" ]; then
-        last_login_time="Never logged in"
-    fi
+		# Check if last_login_ip is an IP address
+		if [[ "$last_login_ip" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+			last_login_ip_present=1
+			last_login_time=$(echo "$last_login" | awk 'NR==2 {print $6, $7, $10, $8}')
+		else
+			last_login_time=$(echo "$last_login" | awk 'NR==2 {print $4, $5, $8, $6}')
+			# Check for **Never logged in** edge case
+			if [ "$last_login_time" = "in**" ]; then
+				last_login_time="Never logged in"
+			fi
+		fi
 fi
 
-sys_uptime=$(uptime -p | sed 's/up\s*//; s/\s*day\(s*\)/d/; s/\s*hour\(s*\)/h/; s/\s*minute\(s*\)/m/')
+# Uptime
+get_uptime() {
+    if [ -f /proc/uptime ]; then
+        # Linux
+        local uptime_seconds=$(cut -d. -f1 /proc/uptime)
+    elif command -v sysctl >/dev/null 2>&1; then
+        # BSD/macOS
+        local boot_time=$(sysctl -n kern.boottime | awk '{print $4}' | tr -d ',')
+        local uptime_seconds=$(($(date +%s) - boot_time))
+    else
+        echo "Unknown"
+        return
+    fi
+
+    local days=$((uptime_seconds / 86400))
+    local hours=$(((uptime_seconds % 86400) / 3600))
+    local mins=$(((uptime_seconds % 3600) / 60))
+
+    local result=""
+    [ $days -gt 0 ] && result="${days}d "
+    [ $hours -gt 0 ] && result="${result}${hours}h "
+    [ $mins -gt 0 ] && result="${result}${mins}m"
+
+    echo "$result"
+}
+
+if [ -f /proc/uptime ]; then
+    # Use /proc/uptime calculation above
+    sys_uptime=$(get_uptime)
+elif command -v uptime >/dev/null 2>&1 && uptime -p >/dev/null 2>&1; then
+    # GNU uptime with -p flag
+    sys_uptime=$(uptime -p | sed 's/up\s*//; s/\s*day\(s*\)/d/; s/\s*hour\(s*\)/h/; s/\s*minute\(s*\)/m/')
+else
+    # Fallback
+    sys_uptime=$(uptime | sed 's/.*up *//; s/,.*user.*//' | sed 's/ days*/d/; s/:/h /; s/ min.*//')
+fi
+
 
 # Set current length before graphs get calculated
 set_current_len
@@ -352,7 +390,7 @@ done
 PRINT_DATA "USER" "$net_current_user"
 PRINT_DIVIDER
 PRINT_DATA "PROCESSOR" "$cpu_model"
-PRINT_DATA "CORES" "$cpu_cores_per_socket vCPU(s) / $cpu_sockets Socket(s)"
+PRINT_DATA "CORES" "$cpu_cores_per_socket CPU(s) / $cpu_sockets Socket(s)"
 PRINT_DATA "HYPERVISOR" "$cpu_hypervisor"
 PRINT_DATA "CPU FREQ" "$cpu_freq GHz"
 PRINT_DATA "LOAD  1m" "$cpu_1min_bar_graph"
@@ -374,7 +412,9 @@ PRINT_DIVIDER
 PRINT_DATA "MEMORY" "${mem_used_gb}/${mem_total_gb} GiB [${mem_percent}%]"
 PRINT_DATA "USAGE" "${mem_bar_graph}"
 PRINT_DIVIDER
-PRINT_DATA "LAST LOGIN" "$last_login_time"
+if [ ! -z $last_login_time ]; then
+		PRINT_DATA "LAST LOGIN" "$last_login_time"
+fi
 
 if [ $last_login_ip_present -eq 1 ]; then
     PRINT_DATA "" "$last_login_ip"

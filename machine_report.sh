@@ -267,14 +267,18 @@ net_dns_ip=($(grep '^nameserver [0-9.]' /etc/resolv.conf | awk '{print $2}'))
 # CPU Information
 cpu_model="$(lscpu | grep 'Model name' | grep -v 'BIOS' | cut -f 2 -d ':' | awk '{print $1 " "  $2 " " $3 " " $4}')"
 cpu_hypervisor="$(lscpu | grep 'Hypervisor vendor' | cut -f 2 -d ':' | awk '{$1=$1}1')"
-if [ -z "$cpu_hypervisor" ]; then
-    cpu_hypervisor="Bare Metal"
-fi
 
 cpu_cores="$(nproc --all)"
-cpu_cores_per_socket="$(lscpu | grep 'Core(s) per socket' | cut -f 2 -d ':'| awk '{$1=$1}1')"
-cpu_sockets="$(lscpu | grep 'Socket(s)' | cut -f 2 -d ':' | awk '{$1=$1}1')"
+cpu_sockets=$(grep 'physical id' /proc/cpuinfo 2>/dev/null | sort -u | wc -l)
 cpu_freq="$(grep 'cpu MHz' /proc/cpuinfo | cut -f 2 -d ':' | awk 'NR==1 { printf "%.2f", $1 / 1000 }')" # Convert from M to G units
+
+# Construct CPU oneliner
+# If there is only one socket, doesn't make sense to print sockets
+plural=$( (( cpu_cores != 1 )) && echo "s" )
+cpu_text="$cpu_cores CPU${plural}"
+if (( ${cpu_sockets:-1} > 1 )); then
+  cpu_text+=" / $cpu_sockets Sockets"
+fi
 
 load_avg_1min=$(uptime | awk -F'load average: ' '{print $2}' | cut -d ',' -f1 | tr -d ' ')
 load_avg_5min=$(uptime | awk -F'load average: ' '{print $2}' | cut -d ',' -f2 | tr -d ' ')
@@ -414,9 +418,13 @@ done
 PRINT_DATA "USER" "$net_current_user"
 PRINT_DIVIDER
 PRINT_DATA "PROCESSOR" "$cpu_model"
-PRINT_DATA "" "$cpu_cores_per_socket CPU(s) / $cpu_sockets Socket(s)"
-PRINT_DATA "HYPERVISOR" "$cpu_hypervisor"
-PRINT_DATA "CPU FREQ" "$cpu_freq GHz" # TODO Remove
+PRINT_DATA "" "$cpu_text"
+if [ ! -z "$cpu_hypervisor" ]; then
+  PRINT_DATA "HYPERVISOR" "$cpu_hypervisor"
+fi
+if [ ! -z "$cpu_freq" ]; then
+  PRINT_DATA "CPU FREQ" "$cpu_freq GHz"
+fi
 PRINT_DATA "LOAD  1m" "$cpu_1min_bar_graph"
 PRINT_DATA "      5m" "$cpu_5min_bar_graph"
 PRINT_DATA "      15m" "$cpu_15min_bar_graph"

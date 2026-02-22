@@ -311,9 +311,9 @@ if [[ $( command -v lastlog ) ]]; then
 		# Check if last_login_ip is an IP address
 		if [[ "$last_login_ip" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
 			last_login_ip_present=1
-			last_login_time=$(echo "$last_login" | awk 'NR==2 {print $6, $7, $10, $8}')
+			last_login_time=$(echo "$last_login" | awk 'NR==2 {print $4, $5, $6, $7}')
 		else
-			last_login_time=$(echo "$last_login" | awk 'NR==2 {print $4, $5, $8, $6}')
+			last_login_time=$(echo "$last_login" | awk 'NR==2 {print $4, $5, $6, $7}')
 			# Check for **Never logged in** edge case
 			if [ "$last_login_time" = "in**" ]; then
 				last_login_time="Never logged in"
@@ -416,7 +416,7 @@ PRINT_DIVIDER
 PRINT_DATA "MEMORY" "${mem_used_gb}/${mem_total_gb} GiB [${mem_percent}%]"
 PRINT_DATA "USAGE" "${mem_bar_graph}"
 PRINT_DIVIDER
-if [ ! -z $last_login_time ]; then
+if [ ! -z "$last_login_time" ]; then
 		PRINT_DATA "LAST LOGIN" "$last_login_time"
 fi
 

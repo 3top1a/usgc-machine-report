@@ -414,12 +414,12 @@ done
 PRINT_DATA "USER" "$net_current_user"
 PRINT_DIVIDER
 PRINT_DATA "PROCESSOR" "$cpu_model"
-PRINT_DATA "CORES" "$cpu_cores_per_socket CPU(s) / $cpu_sockets Socket(s)"
+PRINT_DATA "" "$cpu_cores_per_socket CPU(s) / $cpu_sockets Socket(s)"
 PRINT_DATA "HYPERVISOR" "$cpu_hypervisor"
-PRINT_DATA "CPU FREQ" "$cpu_freq GHz"
+PRINT_DATA "CPU FREQ" "$cpu_freq GHz" # TODO Remove
 PRINT_DATA "LOAD  1m" "$cpu_1min_bar_graph"
-PRINT_DATA "LOAD  5m" "$cpu_5min_bar_graph"
-PRINT_DATA "LOAD 15m" "$cpu_15min_bar_graph"
+PRINT_DATA "      5m" "$cpu_5min_bar_graph"
+PRINT_DATA "      15m" "$cpu_15min_bar_graph"
 
 
 PRINT_DIVIDER
@@ -442,7 +442,7 @@ done
 
 PRINT_DIVIDER
 PRINT_DATA "MEMORY" "${mem_used_gb}/${mem_total_gb} GiB [${mem_percent}%]"
-PRINT_DATA "USAGE" "${mem_bar_graph}"
+PRINT_DATA "" "${mem_bar_graph}"
 PRINT_DIVIDER
 if [ ! -z "$last_login_time" ]; then
 		PRINT_DATA "LAST LOGIN" "$last_login_time"

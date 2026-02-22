@@ -291,11 +291,11 @@ mem_total_gb=$(echo "$mem_total" | awk '{ printf "%.2f", $1 / (1024 * 1024) }') 
 mem_used_gb=$(echo "$mem_used" | awk '{ printf "%.2f", $1 / (1024 * 1024) }')
 
 # Disk Information
-# TODO Change into something more portable - `df -T` is a GNU extension
 declare -a disk_names
 declare -a disk_info
+declare -a disk_use_percent
 declare -a disk_graphs
-while read -r filesystem fs_type blocks used available use_percent mount_point; do
+while read -r filesystem size used available use_percent mount_point; do
     # Always include root, skip pseudo filesystem mount points for others
     if [[ "$mount_point" != "/" ]]; then
         case "$mount_point" in
@@ -304,21 +304,16 @@ while read -r filesystem fs_type blocks used available use_percent mount_point; 
                 ;;
         esac
     fi
-    
-    # Get disk usage stats
-    used=$(df -m "$mount_point" 2>/dev/null | awk 'NR==2 {print $3}')
-    total=$(df -m "$mount_point" 2>/dev/null | awk 'NR==2 {print $2}')
-    
-    if [ -n "$used" ] && [ -n "$total" ]; then
-        used_gb=$(awk -v used="$used" 'BEGIN { printf "%.2f", used / 1024 }')
-        total_gb=$(awk -v total="$total" 'BEGIN { printf "%.2f", total / 1024 }')
-        percent=$(awk -v used="$used" -v total="$total" 'BEGIN { printf "%.2f", (used / total) * 100 }')
-        
-        # Store data for each disk
+
+    if [ -n "$used" ] && [ -n "$size" ]; then
+        used=$((used / 1000 / 1000))
+        size=$((size / 1000 / 1000))
+        percents=${use_percent::-1}
         disk_names+=("$mount_point")
-        disk_info+=("${used_gb}/${total_gb} GB [${percent}%]")
+        disk_info+=("${used}GB / ${size}GB [${percents}%]")
+        disk_use_percent+=("$percents")
     fi
-done < <(df -T | tail -n +2)
+done < <(df | tail -n +2)
 
 
 # Last login and Uptime
@@ -390,10 +385,7 @@ mem_bar_graph=$(bar_graph "$mem_used" "$mem_total")
 
 # Disk bar graphs
 for i in "${!disk_names[@]}"; do
-    mount_point="${disk_names[$i]}"
-    used=$(df -m "$mount_point" | awk 'NR==2 {print $3}')
-    total=$(df -m "$mount_point" | awk 'NR==2 {print $2}')
-    disk_graphs+=("$(bar_graph "$used" "$total")")
+    disk_graphs+=("$(bar_graph "${disk_use_percent[$i]}" "100")")
 done
 
 # Machine Report

@@ -19,8 +19,6 @@ BORDERS_AND_PADDING=7
 # Basic configuration, change as needed
 report_title="UNITED STATES GRAPHICS COMPANY"
 last_login_ip_present=0
-zfs_present=0
-zfs_filesystem="zroot/ROOT/os"
 
 # Utilities
 max_length() {
@@ -43,32 +41,40 @@ max_length() {
 
 # All data strings must go here
 set_current_len() {
-    CURRENT_LEN=$(max_length                                     \
-        "$report_title"                                          \
-        "$os_name"                                               \
-        "$os_kernel"                                             \
-        "$net_hostname"                                          \
-        "$net_machine_ip"                                        \
-        "$net_client_ip"                                         \
-        "$net_current_user"                                      \
-        "$cpu_model"                                             \
-        "$cpu_cores_per_socket CPU(s) / $cpu_sockets Socket(s)" \
-        "$cpu_hypervisor"                                        \
-        "$cpu_freq GHz"                                          \
-        "$cpu_1min_bar_graph"                                    \
-        "$cpu_5min_bar_graph"                                    \
-        "$cpu_15min_bar_graph"                                   \
-        "$zfs_used_gb/$zfs_available_gb GB [$disk_percent%]"     \
-        "$disk_bar_graph"                                        \
-        "$zfs_health"                                            \
-        "$root_used_gb/$root_total_gb GB [$disk_percent%]"       \
-        "${mem_used_gb}/${mem_total_gb} GiB [${mem_percent}%]"   \
-        "${mem_bar_graph}"                                       \
-        "$last_login_time"                                       \
-        "$last_login_ip"                                         \
-        "$last_login_ip"                                         \
-        "$sys_uptime"                                            \
+	local all_strings=(
+        "$report_title"
+        "$os_name"
+        "$os_kernel"
+        "$net_hostname"
+        "$net_machine_ip"
+        "$net_client_ip"
+        "$net_current_user"
+        "$cpu_model"
+        "$cpu_cores_per_socket CPU(s) / $cpu_sockets Socket(s)"
+        "$cpu_hypervisor"
+        "$cpu_freq GHz"
+        "$cpu_1min_bar_graph"
+        "$cpu_5min_bar_graph"
+        "$cpu_15min_bar_graph"
+        "$zfs_used_gb/$zfs_available_gb GB [$disk_percent%]"
+        "$disk_bar_graph"
+        "$zfs_health"
+        "$root_used_gb/$root_total_gb GB [$disk_percent%]"
+        "${mem_used_gb}/${mem_total_gb} GiB [${mem_percent}%]"
+        "${mem_bar_graph}"
+        "$last_login_time"
+        "$last_login_ip"
+        "$sys_uptime"
     )
+
+
+    # Add all disk info strings
+    for info in "${disk_info[@]}"; do
+        all_strings+=("$info")
+    done
+
+    CURRENT_LEN=$(max_length "${all_strings[@]}")
+
 }
 
 PRINT_HEADER() {
@@ -285,23 +291,35 @@ mem_available_gb=$(echo "$mem_available" | awk '{ printf "%.2f", $1 / (1024 * 10
 mem_used_gb=$(echo "$mem_used" | awk '{ printf "%.2f", $1 / (1024 * 1024) }')
 
 # Disk Information
-if [ "$(command -v zfs)" ] && [ "$(grep -q "zfs" /proc/mounts)" ]; then
-    zfs_present=1
-    zfs_health=$(zpool status -x zroot | grep -q "is healthy" && echo  "HEALTH O.K.")
-    zfs_available=$(zfs get -o value -Hp available "$zfs_filesystem")
-    zfs_used=$(zfs get -o value -Hp used "$zfs_filesystem")
-    zfs_available_gb=$(echo "$zfs_available" | awk '{ printf "%.2f", $1 / (1024 * 1024 * 1024) }') # (To G units)
-    zfs_used_gb=$(echo "$zfs_used" | awk '{ printf "%.2f", $1 / (1024 * 1024 * 1024) }') # (To G units)
-    disk_percent=$(awk -v used="$zfs_used" -v available="$zfs_available" 'BEGIN { printf "%.2f", (used / available) * 100 }')
-else
-    # Thanks https://github.com/AnarchistHoneybun
-    root_partition="/"
-    root_used=$(df -m "$root_partition" | awk 'NR==2 {print $3}')
-    root_total=$(df -m "$root_partition" | awk 'NR==2 {print $2}')
-    root_total_gb=$(awk -v total="$root_total" 'BEGIN { printf "%.2f", total / 1024 }')
-    root_used_gb=$(awk -v used="$root_used" 'BEGIN { printf "%.2f", used / 1024 }')
-    disk_percent=$(awk -v used="$root_used" -v total="$root_total" 'BEGIN { printf "%.2f", (used / total) * 100 }')
-fi
+# TODO Change into something more portable - `df -T` is a GNU extension
+declare -a disk_names
+declare -a disk_info
+declare -a disk_graphs
+while read -r filesystem fs_type blocks used available use_percent mount_point; do
+    # Always include root, skip pseudo filesystem mount points for others
+    if [[ "$mount_point" != "/" ]]; then
+        case "$mount_point" in
+            /dev|/dev/*|/boot|/boot/*|/sys|/sys/*|/proc|/proc/*|/run|/run/*|/tmp)
+                continue
+                ;;
+        esac
+    fi
+    
+    # Get disk usage stats
+    used=$(df -m "$mount_point" 2>/dev/null | awk 'NR==2 {print $3}')
+    total=$(df -m "$mount_point" 2>/dev/null | awk 'NR==2 {print $2}')
+    
+    if [ -n "$used" ] && [ -n "$total" ]; then
+        used_gb=$(awk -v used="$used" 'BEGIN { printf "%.2f", used / 1024 }')
+        total_gb=$(awk -v total="$total" 'BEGIN { printf "%.2f", total / 1024 }')
+        percent=$(awk -v used="$used" -v total="$total" 'BEGIN { printf "%.2f", (used / total) * 100 }')
+        
+        # Store data for each disk
+        disk_names+=("$mount_point")
+        disk_info+=("${used_gb}/${total_gb} GB [${percent}%]")
+    fi
+done < <(df -T | tail -n +2)
+
 
 # Last login and Uptime
 if [[ $( command -v lastlog ) ]]; then
@@ -369,11 +387,13 @@ cpu_15min_bar_graph=$(bar_graph "$load_avg_15min" "$cpu_cores")
 
 mem_bar_graph=$(bar_graph "$mem_used" "$mem_total")
 
-if [ $zfs_present -eq 1 ]; then
-    disk_bar_graph=$(bar_graph "$zfs_used" "$zfs_available")
-else
-    disk_bar_graph=$(bar_graph "$root_used" "$root_total")
-fi
+# Disk bar graphs
+for i in "${!disk_names[@]}"; do
+    mount_point="${disk_names[$i]}"
+    used=$(df -m "$mount_point" | awk 'NR==2 {print $3}')
+    total=$(df -m "$mount_point" | awk 'NR==2 {print $2}')
+    disk_graphs+=("$(bar_graph "$used" "$total")")
+done
 
 # Machine Report
 PRINT_HEADER
@@ -401,16 +421,24 @@ PRINT_DATA "LOAD  1m" "$cpu_1min_bar_graph"
 PRINT_DATA "LOAD  5m" "$cpu_5min_bar_graph"
 PRINT_DATA "LOAD 15m" "$cpu_15min_bar_graph"
 
-if [ $zfs_present -eq 1 ]; then
-    PRINT_DIVIDER
-    PRINT_DATA "VOLUME" "$zfs_used_gb/$zfs_available_gb GB [$disk_percent%]"
-    PRINT_DATA "DISK USAGE" "$disk_bar_graph"
-    PRINT_DATA "ZFS HEALTH" "$zfs_health"
-else
-    PRINT_DIVIDER
-    PRINT_DATA "VOLUME" "$root_used_gb/$root_total_gb GB [$disk_percent%]"
-    PRINT_DATA "DISK USAGE" "$disk_bar_graph"
-fi
+
+PRINT_DIVIDER
+
+for i in "${!disk_names[@]}"; do
+    mount_point="${disk_names[$i]}"
+	if [[ -z $mount_point ]]; then
+		continue
+	fi
+
+    # Truncate long mount points for display
+    display_name="$mount_point"
+    if [ "${#display_name}" -gt 10 ]; then
+        display_name="$(echo "$display_name" | cut -c 1-7)..."
+    fi
+    
+    PRINT_DATA "$display_name" "${disk_info[$i]}"
+    PRINT_DATA "" "${disk_graphs[$i]}"
+done
 
 PRINT_DIVIDER
 PRINT_DATA "MEMORY" "${mem_used_gb}/${mem_total_gb} GiB [${mem_percent}%]"
